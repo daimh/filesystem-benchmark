@@ -1,0 +1,1 @@
+Each run starts "m4Tasks" tasks on every node. Each task executes the 'lib/RandIo'.py script, which opens a file of size "m4MBPerTask" MB created by SeqWriteDd without buffering, and writes the entire file in a randomized order. Each IO writes "m4BytesPerRandIO" bytes.

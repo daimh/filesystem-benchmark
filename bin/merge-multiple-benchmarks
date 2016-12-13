@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+trap "exit 1" TERM
+function helpme {
+	if [ $# -gt 0 ]
+	then
+		echo -e "$1" 1>&2
+	else
+		grep '#' /proc/$$/fd/255 |
+			sed -n '/^#HELPME_START/,/^#HELPME_END/p' |
+			grep -v "^#HELPME_" |
+			sed "s/#//" |
+			tr -s '\t' 1>&2
+	fi
+	kill 0
+}
+Description=""
+Force=NO
+OptShort="hvd:f"
+OptLong="help,version,description:,f"
+Opts=$(getopt -o $OptShort --long $OptLong -n "$(basename $0)" -- "$@")
+eval set -- "$Opts"
+while [ $# -gt 0 ]
+do
+	case "$1" in
+#HELPME_START
+#NAME
+#	merge-multi-tests - merge multiple benchmarks' output as a single report with comparison boxplots
+#SYNOPSIS
+#	merge-multi-tests [OPTION]... ReportPrefix TestDir1 TestDir2...
+#EXAMPLE
+#	merge-multi-tests -fd single-vs-dual-description.md single-vs-dual single/ dual/
+#DESCRIPTION
+		-h | --help) #display help and exit
+			helpme ;;
+		--version) #display version and exit
+			helpme "20161212" ;;
+		-v )	#verbose output
+			set -x
+			shift ;;
+		-d | --description)	#extra description markdown file, optional
+			Description=$2
+			[ -f "$Description" ] || helpme "ERR-003: No such file \"$Description\""
+			shift 2 ;;
+		-f | --force)	#override existing files
+			Force=YES
+			shift ;;
+		--)
+			shift 1 ;;
+		*)
+			break ;;
+#AUTHOR
+#	Manhong Dai, daimh@umich.edu
+#HELPME_END
+	esac
+done
+[ $# -ge 3 ] || helpme "ERR-001: use -h for help"
+Prefix=$1
+shift
+[ -n "$Prefix" ] || helpme "ERR-002: use -h for help"
+if [ "$Force" = YES ]
+then
+	rm -f "$Prefix.md"
+elif [ -f "$Prefix.md" ]
+then
+	helpme "ERR-004: \"$Prefix.md\" already exists"
+fi
+
+Tests=()
+Dir1=$1
+shift
+for Test in $(grep ^Tests $Dir1/setting.mk | cut -d = -f 2)
+do
+	Plot=$Dir1/plot/$Test-TotalBox.plt
+	[ -f $Plot ] || continue
+	List=($Dir1)
+	Plot=$(basename $Plot)
+	Plot=${Plot:0:-4}
+	for DirN in $@
+	do
+		[ -f $DirN/plot/$Plot.plt ] || continue
+		List+=($DirN)
+	done
+	(( (( ${#List[@]} - 1)) == $# )) || continue
+	Tests+=($Test)
+	sed -e "s@\($Plot.png\)@$Prefix-\1@; /$Plot.dat/d; /unset key/d" $Dir1/plot/$Plot.plt > $Prefix-$Plot.plt
+	echo "plot \\" >> $Prefix-$Plot.plt
+	N=${#List[@]}
+	Width=$(bc <<< "scale=2; 0.35/$N" )
+	Step=0
+	Base=1
+	if [ "$N" != "1" ] 
+	then
+		Step=$(bc <<< "scale=2; 0.1/($N-1)" )
+		Base=$(bc <<< "scale=2; 1+($Step+$Width)/2-($Step+$Width)*($N/2)" )
+	fi
+	! ((Idx=0))
+	for Dir in $Dir1 $@
+	do
+		echo "\"$Dir/plot/$Plot.dat\" using ($Base):4:($Width):2 title \"$(basename $Dir)\", \\" >> $Prefix-$Plot.plt
+		Base=$(bc <<< "scale=2; $Base+$Step+$Width" )
+		((Idx+=1))
+	done
+	gnuplot $Prefix-$Plot.plt
+done
+echo -en "# Executive Summary\nComparison between " > $Prefix.md
+echo "\"${Dir1} $@\"" | sed -e "s/ /, /g" >> $Prefix.md
+if [ -s "$Description" ]
+then
+	echo >> $Prefix.md
+	cat $Description >> $Prefix.md
+fi
+for Test in ${Tests[@]}
+do
+	echo -e "\n## $Test\n![]($Prefix-$Test-TotalBox.png)" >> $Prefix.md
+done
+for Dir in ${Dir1} $@
+do
+	echo -e "\n# $Dir\n" >> $Prefix.md
+	sed -e "s@^#@##@; s@plot/@$Dir/plot/@" $Dir/report.md >> $Prefix.md
+done
+pandoc -V colorlinks=true --toc -o $Prefix.pdf $Prefix.md
