@@ -222,7 +222,7 @@ var/test/SeqReadDd-$2-$1 : var/test/SeqWriteDd-$2-$1
 			done; \
 			wait; \
 		) \
-	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MB \
+	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MiB \
 		| tee $$@.txt
 	date | tee $$@
 
@@ -242,7 +242,7 @@ var/test/SeqWriteDd-$2-$1 : var/test/init-$1
 			done; \
 			wait; \
 		) \
-	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MB \
+	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MiB \
 		| tee $$@.txt
 	date | tee $$@
 
@@ -299,7 +299,7 @@ var/test/SeqReadFio-$2-$1 : var/test/SeqWriteFio-$2-$1
 				--direct=$(Direct) --bs=$(MBPerSeqIO)m --ioengine=libaio \
 				--iodepth=16 --numjobs=$2 --rw=read --readonly; \
 		) \
-	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MB \
+	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MiB \
 		| tee $$@.txt
 	rsync -av $1:$(MountPoint)/$(TestDir)/$$@*.fio var/test
 	date | tee $$@
@@ -316,7 +316,7 @@ var/test/SeqWriteFio-$2-$1 : var/test/init-$1
 				--direct=$(Direct) --bs=$(MBPerSeqIO)m --ioengine=libaio \
 				--iodepth=16 --numjobs=$2 --rw=write; \
 		) \
-	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MB \
+	' 2>&1 | tee $$@.raw | lib/post-time.sh $2*$(MBPerTask) MiB \
 		| tee $$@.txt
 	rsync -av $1:$(MountPoint)/$(TestDir)/$$@*.fio var/test
 	date | tee $$@
