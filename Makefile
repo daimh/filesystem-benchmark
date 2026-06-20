@@ -5,14 +5,19 @@ WorkerBin = /tmp/filesystem-benchmark-bin
 all :
 	make clean
 	make init
+	cp setting.mk var/test/
+	set -x; \
 	for TT in $(Tests); \
 	do \
 		for TK in $(Tasks); \
 		do \
 			make -j var/test/$$TT-$$TK; \
 		done; \
-	done 2>&1 | tee var/test/log
-	make rename
+	done 2>&1 | tee var/test/log || ( \
+		mv var/test var/fail-$$(date -Is); \
+		false; \
+	)
+	make save
 	make report
 
 M4Report = cat lib/report/$$TT.m4 \
@@ -325,7 +330,7 @@ endef
 $(foreach N,$(Nodes),$(foreach TT,$(Tasks),$(eval $(call \
 	TmplNodeTask,$N,$(TT)))))
 
-rename : $(addprefix var/test/rename-,$(Nodes))
+save : $(addprefix var/test/save-,$(Nodes))
 	mv var/test var/test-$$(date -Is)
 
 clean :
@@ -340,7 +345,7 @@ init : $(addprefix var/test/init-,$(Nodes))
 	lib/worker-bin/check-os-packages.sh localhost
 
 define TmplNode
-var/test/rename-$1 :
+var/test/save-$1 :
 	ssh $1 "set -Eeuo pipefail; \
 		df -Ph $(MountPoint); \
 		mv $(MountPoint)/$(TestDir)/var/test \
